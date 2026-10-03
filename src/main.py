@@ -35,8 +35,11 @@ def main():
         print("Running figures...")
         # To be implemented in M8
     elif command == "report":
-        print("Running report...")
-        # To be implemented in M9
+        from src.report import generate_report
+        generate_report()
+    elif command == "app":
+        import subprocess
+        subprocess.run(["python", "src/app.py"])
     else:
         print(f"Unknown command {command}")
         
