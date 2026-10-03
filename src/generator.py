@@ -21,14 +21,35 @@ class LegalCorpusGenerator:
         self._build_lexicon()
         
     def _build_lexicon(self):
-        # 1. Boilerplate (approx 150 words)
-        num_boilerplate = 150
-        self.boilerplate_vocab = [f"boiler_{i}" for i in range(num_boilerplate)]
+        # 1. Boilerplate (legal sounding structural words)
+        boilerplate_terms = [
+            "the", "of", "and", "in", "to", "a", "is", "that", "for", "it", "as", "was",
+            "court", "held", "judge", "appellant", "respondent", "appeal", "dismissed",
+            "statute", "section", "act", "law", "rule", "plaintiff", "defendant", "trial",
+            "evidence", "fact", "issue", "finding", "therefore", "however", "furthermore",
+            "stated", "argued", "claimed", "judgment", "order", "decision", "rights",
+            "party", "parties", "proceedings", "jurisdiction", "matter", "case", "action",
+            "liability", "damages", "claim", "duty", "breach", "contract", "tort", "property",
+            "criminal", "family", "ip", "tax", "constitutional", "administrative", "civil",
+            "pursuant", "accordance", "respect", "regarding", "concerning", "relating"
+        ]
+        # Pad with some random words if needed to reach exactly 150 for Dirichlet, or just use length
+        num_boilerplate = len(boilerplate_terms)
+        self.boilerplate_vocab = boilerplate_terms
         self.boilerplate_probs = self.rng.dirichlet(np.ones(num_boilerplate) * 0.1)
         
-        # 2. Base vocabulary pool (Zipfian)
-        self.base_vocab = [f"word_{i}" for i in range(self.vocab_size)]
-        
+        # 2. Base vocabulary pool (Zipfian) from english_words.txt
+        try:
+            with open("data/english_words.txt", "r") as f:
+                words = [w.strip() for w in f.readlines() if w.strip()]
+            self.base_vocab = words[:self.vocab_size]
+        except:
+            self.base_vocab = [f"word_{i}" for i in range(self.vocab_size)]
+            
+        # Ensure we have enough words
+        if len(self.base_vocab) < self.vocab_size:
+            self.vocab_size = len(self.base_vocab)
+            
         # Area specific pools
         area_pool_size = self.vocab_size // self.num_areas
         area_pools = [self.base_vocab[i*area_pool_size:(i+1)*area_pool_size] for i in range(self.num_areas)]
