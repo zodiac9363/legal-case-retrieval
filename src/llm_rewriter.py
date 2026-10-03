@@ -4,13 +4,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import json
 import hashlib
 import time
+import requests
 import numpy as np
 from src.pipeline import load_dataset
-from google import genai
-from google.genai import types
 
-MODEL_NAME = 'gemini-2.5-flash'
+OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL_NAME = "qwen2.5:3b"
 TEMPERATURE = 0.3
+MAX_TOKENS = 400
 
 def get_boilerplate_terms():
     return {
@@ -33,7 +34,7 @@ def get_cache_key(text, model, temperature):
     raw = f"{text}_{model}_{temperature}"
     return hashlib.md5(raw.encode()).hexdigest()
 
-def rewrite_text(client, text, boilerplate, cache_dir, is_query=False):
+def rewrite_text(text, boilerplate, cache_dir, is_query=False):
     cache_key = get_cache_key(text, MODEL_NAME, TEMPERATURE)
     cache_path = os.path.join(cache_dir, f"{cache_key}.json")
     
@@ -54,15 +55,19 @@ def rewrite_text(client, text, boilerplate, cache_dir, is_query=False):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            response = client.models.generate_content(
-                model=MODEL_NAME,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=TEMPERATURE,
-                )
-            )
-            
-            rewritten = response.text.strip()
+            payload = {
+                "model": MODEL_NAME,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": TEMPERATURE,
+                    "num_predict": MAX_TOKENS
+                },
+                "keep_alive": "30m"
+            }
+            response = requests.post(OLLAMA_URL, json=payload, timeout=300)
+            response.raise_for_status()
+            rewritten = response.json().get("response", "").strip()
             
             # Validation
             orig_len = len(text.split())
@@ -96,12 +101,7 @@ def rewrite_text(client, text, boilerplate, cache_dir, is_query=False):
     print("Failed to rewrite after retries, falling back to original.")
     return text
 
-def create_rewritten_dataset(base_dataset_path, output_dataset_path, num_docs=300):
-    if not os.environ.get("GEMINI_API_KEY"):
-        print("Error: GEMINI_API_KEY environment variable is not set. Skipping LLM rewriting.")
-        return False
-        
-    client = genai.Client()
+def create_rewritten_dataset(base_dataset_path, output_dataset_path, num_docs=10):
     corpus, doc_ids, doc_aspects, cluster_ids, queries, qrels = load_dataset(base_dataset_path)
     
     # Setup cache
@@ -132,7 +132,7 @@ def create_rewritten_dataset(base_dataset_path, output_dataset_path, num_docs=30
     os.makedirs(subset_dataset_path, exist_ok=True)
     
     # 3. Save BoW Docs and Rewrite Docs
-    print(f"Rewriting {len(selected_doc_indices)} documents...")
+    print(f"Rewriting {len(selected_doc_indices)} documents via Ollama (qwen2.5:3b)...")
     with open(os.path.join(output_dataset_path, "corpus.jsonl"), "w") as f_rewritten, \
          open(os.path.join(subset_dataset_path, "corpus.jsonl"), "w") as f_bow:
         for idx in selected_doc_indices:
@@ -149,7 +149,7 @@ def create_rewritten_dataset(base_dataset_path, output_dataset_path, num_docs=30
             f_bow.write(json.dumps(bow_obj) + "\n")
             
             # Rewrite and save
-            rewritten = rewrite_text(client, text, boilerplate, cache_dir, is_query=False)
+            rewritten = rewrite_text(text, boilerplate, cache_dir, is_query=False)
             doc_obj = {
                 "id": doc_id,
                 "text": rewritten,
@@ -167,7 +167,7 @@ def create_rewritten_dataset(base_dataset_path, output_dataset_path, num_docs=30
             f_bow.write(json.dumps(q) + "\n")
             
             # Rewrite and save
-            rewritten = rewrite_text(client, q['text'], boilerplate, cache_dir, is_query=True)
+            rewritten = rewrite_text(q['text'], boilerplate, cache_dir, is_query=True)
             q_obj = {
                 "id": q['id'],
                 "text": rewritten,
@@ -187,4 +187,4 @@ def create_rewritten_dataset(base_dataset_path, output_dataset_path, num_docs=30
 if __name__ == "__main__":
     base_path = "data/R1_rho0.5_skew_low_seed0"
     out_path = "data/R1_rewritten"
-    create_rewritten_dataset(base_path, out_path)
+    create_rewritten_dataset(base_path, out_path, num_docs=10)
