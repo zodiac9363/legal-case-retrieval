@@ -35,6 +35,7 @@ Diversity helps significantly when the pool has high redundancy and the query co
 
 ## 9. Limitations and Threats to Validity
 Results on synthetic data are NOT claims about real legal corpora (e.g., COLIEE). The generator relies on a bag-of-words assumption.
+Furthermore, the LLM-rewritten subset (E7b) tests robustness to lexical variation only and does not make the synthetic corpus equivalent to real legal data.
 
 ## 10. Ethics
 Data is synthetic. No legal advice is provided.

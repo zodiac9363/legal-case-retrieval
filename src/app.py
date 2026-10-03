@@ -16,7 +16,13 @@ state = {}
 
 def init_app():
     config = load_config("config.yaml")
-    path = os.path.join(config['data']['base_path'], config['data']['default_regime'])
+    # Prefer rewritten subset for UI if it exists
+    rewritten_path = "data/R1_rewritten"
+    if os.path.exists(rewritten_path):
+        path = rewritten_path
+    else:
+        path = os.path.join(config['data']['base_path'], config['data']['default_regime'])
+        
     if not os.path.exists(path):
         return
         
