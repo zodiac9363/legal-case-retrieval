@@ -12,10 +12,19 @@ def main():
         generate_all_datasets()
     elif command == "baselines":
         print("Running baselines...")
-        # To be implemented in M2
+        from src.pipeline import cross_validate, load_config
+        import os
+        config = load_config("config.yaml")
+        path = os.path.join(config['data']['base_path'], config['data']['default_regime'])
+        cross_validate(path, config, method='bm25')
+        cross_validate(path, config, method='mmr')
     elif command == "main":
-        print("Running main...")
-        # To be implemented in M3/M5
+        print("Running main proposed method...")
+        from src.pipeline import cross_validate, load_config
+        import os
+        config = load_config("config.yaml")
+        path = os.path.join(config['data']['base_path'], config['data']['default_regime'])
+        cross_validate(path, config, method='proposed')
     elif command == "ablations":
         print("Running ablations...")
         # To be implemented in M5
